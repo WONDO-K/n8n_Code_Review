@@ -1,0 +1,22 @@
+name: Validate Infra Config
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose
+        run: docker compose config
+
+      - name: Validate nginx config
+        run: |
+          docker run --rm \
+            -v $PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+            nginx:alpine nginx -t
