@@ -1,0 +1,104 @@
+version: "3.8"
+
+services:
+  postgres:
+    # n8n이 워크플로우/실행로그/크리덴셜(암호화)을 저장할 DB
+    image: postgres:15
+    container_name: n8n-postgres
+    restart: always
+
+    # DB 초기 계정/DB명
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
+
+    # DB 데이터 영구 보관(컨테이너 재시작/재생성해도 유지)
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
+    # 로컬에서 DB 접속해서 확인할 일 있으면 열어두고,
+    # 서버 운영(EC2)에서는 보통 외부 공개 안 함(주석 처리 권장)
+    ports:
+      - "5432:5432"
+
+    # 내부 헬스체크(선택이지만 있으면 안정적)
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  n8n:
+    # n8n 본체(서버 + 웹 UI + 워크플로우 런타임)
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+
+    # n8n 웹 UI 포트
+    ports:
+      - "5678:5678"
+
+    # n8n이 Postgres를 쓰도록 설정
+    environment:
+      TZ: ${TZ}
+
+      # ===== DB 연결 설정 =====
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # ===== 외부 접근 / Webhook URL =====
+      # 로컬 개발용 (현재 사용)
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+
+      # 운영 서버용 (EC2, 도메인 사용 시)
+      # 아래 두 줄은 서버로 옮길 때 주석 해제하고 값 교체
+      # N8N_BASE_URL: https://your-domain-or-ip
+      # WEBHOOK_URL: https://your-domain-or-ip
+
+      # ===== UI 기본 인증 (운영 시 필수) =====
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+
+      # ===== 운영 보안 옵션 (필요 시 활성화) =====
+      # N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+
+      # ===== Function Node 확장 (필요 시) =====
+      # NODE_FUNCTION_ALLOW_EXTERNAL: cheerio
+
+      # (선택) 에디터/진단용. 필요 없으면 제거 가능
+      N8N_DIAGNOSTICS_ENABLED: "false"
+
+    # n8n 설정/데이터(암호화 키, 워크플로우 등) 영구 보관
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+
+    # DB가 준비된 뒤 n8n이 뜨도록
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: n8n-nginx
+    restart: always
+
+    ports:
+      - "80:80"
+      # 운영 시 HTTPS를 쓸 경우
+      # - "443:443"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+    depends_on:
+      - n8n
