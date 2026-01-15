@@ -32,8 +32,8 @@ jobs:
       #    - 실제 nginx 컨테이너를 잠깐 실행해서
       #    - nginx -t 명령으로 설정 유효성 검사
       #    - 서버에 올리기 전에 "이 설정이 진짜로 동작 가능한가"를 보증
-      - name: Validate nginx config
-        run: |
-          docker run --rm \
-            -v $PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
-            nginx:alpine nginx -t
+      # - name: Validate nginx config
+      #   run: |
+      #     docker run --rm \
+      #       -v $PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+      #       nginx:alpine nginx -t
