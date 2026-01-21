@@ -1,0 +1,7 @@
+.env*
+*.dump
+*.sql
+*.tar.gz
+restore_tmp/
+postgres-data/
+n8n-data/
