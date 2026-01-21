@@ -1,39 +1,57 @@
-# GitHub Actions에서 보여질 워크플로우 이름
-# → 이 레포는 인프라 설정을 검증하는 목적이라는 걸 명확히 드러냄
+# GitHub Actions에서 보일 워크플로우 이름
+# 이 레포가 "인프라 설정 검증용"이라는 목적을 드러냄
 name: Validate Infra Config
 
-# 이 워크플로우가 언제 실행될지 정의
+# 언제 이 워크플로우를 실행할지 정의
 on:
-  # main 브랜치에 push 될 때 실행
+  # main 브랜치에 push 될 때
   push:
     branches: ["main"]
 
-  # Pull Request가 생성되거나 수정될 때 실행
+  # PR 생성/수정 시
   pull_request:
 
 jobs:
   validate:
-    # GitHub가 제공하는 Ubuntu 환경에서 실행
+    # GitHub가 제공하는 Ubuntu 러너에서 실행
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 현재 레포지토리 코드를 러너 VM으로 가져옴
+      # 1. 현재 레포를 러너에 체크아웃
       - uses: actions/checkout@v4
 
-      # 2. docker-compose.yml 문법 및 설정 검증
-      #    - YAML 문법 오류
-      #    - 잘못된 키
-      #    - 파싱 불가능한 구조
-      #    같은 문제가 있으면 여기서 바로 실패
-      - name: Validate docker-compose
-        run: docker compose config
+      # 2. CI 전용 더미 env 파일 생성
+      # 실제 서버/로컬 비밀값을 쓰지 않고,
+      # docker compose가 ${VAR} 치환을 끝까지 수행할 수 있도록
+      # "형태만 맞는" 가짜 값을 채워준다.
+      # 목적: 실행이 아니라 "구문/구조 검증"이 가능하게 만드는 것
+      - name: Create dummy env for CI
+        run: |
+          echo "TZ=Asia/Seoul" > .env.ci
+          echo "POSTGRES_USER=dummy" >> .env.ci
+          echo "POSTGRES_PASSWORD=dummy" >> .env.ci
+          echo "POSTGRES_DB=dummy" >> .env.ci
+          echo "N8N_BASIC_AUTH_USER=dummy" >> .env.ci
+          echo "N8N_BASIC_AUTH_PASSWORD=dummy" >> .env.ci
+          echo "N8N_HOST=example.com" >> .env.ci
+          echo "N8N_PROTOCOL=http" >> .env.ci
+          echo "WEBHOOK_URL=http://example.com" >> .env.ci
+          echo "N8N_ENCRYPTION_KEY=dummykey" >> .env.ci
 
-      # 3. nginx 설정 파일 문법 검증
-      #    - 실제 nginx 컨테이너를 잠깐 실행해서
-      #    - nginx -t 명령으로 설정 유효성 검사
-      #    - 서버에 올리기 전에 "이 설정이 진짜로 동작 가능한가"를 보증
-      # - name: Validate nginx config
-      #   run: |
-      #     docker run --rm \
-      #       -v $PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
-      #       nginx:alpine nginx -t
+      # 3. 로컬용 docker-compose 파일 검증
+      # 실제 컨테이너를 띄우지 않고,
+      # YAML 문법, 키 구조, 변수 치환 가능 여부만 검사한다.
+      - name: Validate docker-compose (local)
+        run: docker compose --env-file .env.ci -f docker-compose.local.yml config
+
+      # 4. 서버용 docker-compose 파일 검증
+      - name: Validate docker-compose (server)
+        run: docker compose --env-file .env.ci -f docker-compose.server.yml config
+
+      # 5. nginx 설정 파일 문법 검증 (선택)
+      # nginx 컨테이너를 잠깐 실행해 `nginx -t`로 설정 유효성만 검사
+      - name: Validate nginx config
+        run: |
+          docker run --rm \
+            -v $PWD/nginx/nginx.conf:/etc/nginx/nginx.conf:ro \
+            nginx:alpine nginx -t
