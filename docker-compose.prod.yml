@@ -1,0 +1,57 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      TZ: ${TZ}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: always
+    environment:
+      TZ: ${TZ}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_PASSWORD}
+
+      N8N_HOST: ${N8N_HOST}
+      N8N_PORT: ${N8N_PORT}
+      N8N_PROTOCOL: ${N8N_PROTOCOL}
+      WEBHOOK_URL: ${WEBHOOK_URL}
+      N8N_TRUST_PROXY: ${N8N_TRUST_PROXY}
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE}
+
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "18180:80"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - n8n
+
+volumes:
+  postgres_data:
+  n8n_data:
