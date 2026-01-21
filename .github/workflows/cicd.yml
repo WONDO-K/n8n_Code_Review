@@ -44,9 +44,9 @@ jobs:
       - name: Validate docker-compose (local)
         run: docker compose --env-file .env.ci -f docker-compose.local.yml config
 
-      # 4. 서버용 docker-compose 파일 검증
-      - name: Validate docker-compose (server)
-        run: docker compose --env-file .env.ci -f docker-compose.server.yml config
+      - name: Validate docker-compose (prod)
+        run: docker compose --env-file .env.ci -f docker-compose.prod.yml config
+
 
       # 5. nginx 설정 파일 문법 검증 (선택)
       # nginx 컨테이너를 잠깐 실행해 `nginx -t`로 설정 유효성만 검사
